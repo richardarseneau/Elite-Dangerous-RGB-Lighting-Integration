@@ -1,334 +1,236 @@
-# required modules
-from ChromaPython import ChromaApp, ChromaAppInfo
 import glob
 import os
 import config
 import lifx
-import chroma
-import cue
-import hue
-import subprocess
-from time import sleep
+from time import sleep, time
 from tkinter import *
-import psutil
+import pyttsx3
+import json
+
+engine = pyttsx3.init()
 
 
-###########################################################
+# lights
+def whiteBright():
+    try:
+        lifx.whiteBright()
+    except:
+        print("Failed LIFX")
+
+def whiteDim():
+
+    try:
+        lifx.whiteDim()
+    except:
+        print("Failed LIFX")
+    
+def orange():
+
+    try:
+        lifx.orange()
+    except:
+        print("Failed LIFX")
+        
+    
+def flashGreen():
+
+   lifx.flashGreen(0.5)
+   sleep(0.5)
+   lifx.flashGreen(0.5)
+   sleep(0.5)
+   lifx.flashGreen(0.5)
+    
+def flashRed():
+
+   lifx.flashRed(0.5)
+   sleep(0.5)
+   lifx.flashRed(0.5)
+   sleep(0.5)
+   lifx.flashRed(0.5)
+
+    
+def flashYellow():
+
+   lifx.flashYellow(0.5)
+   sleep(0.5)
+   lifx.flashYellow(0.5)
+   sleep(0.5)
+   lifx.flashYellow(0.5)
+    
+
+# start as dim white
+lifx.default()
+
+sleep(5)
+
+def get_log():
+    # get latest log
+    list_of_files = glob.glob(config.logLocation)
+    try:
+        latest_file = max(list_of_files, key=os.path.getctime)
+    except:
+        print("Please add your Elite Dangerous log file location to the config.py file before running")
+
+    return latest_file
+        
+
+# define events
+underAttack = '"event":"UnderAttack", "Target":"You"'
+hullDamage = '"event":"HullDamage"'
+heatDamage = '"event":"HeatDamage"'
+heatWarning = '"event":"HeatWarning"'
+shieldOff = '"ShieldsUp":false'
+shieldOn = '"ShieldsUp":true'
+
+kill = '"event":"PVPKill"'
+
+supercruiseEnter = '"event":"StartJump", "JumpType":"Supercruise"'
+supercruiseExit = '"event":"SupercruiseExit"'
+hyper_space = '"event":"StartJump", "JumpType":"Hyperspace"'
+hyper_space_exit = '"MusicTrack":"DestinationFromHyperspace"'
+
+fuel = '"event":"ReservoirReplenished",'
+refuel = '"event":"RefuelAll"'
+repair = '"event":"RepairAll"'
+stock = 'fgdsgrerrrrrrrrrgbfxvbfdbndfnfbfbd'
+scanned = '"event":"Scanned"'
+
+system_map = '"MusicTrack":"SystemMap"'
+galaxy_map = '"MusicTrack":"GalaxyMap"'
+scanner = 'SystemAndSurfaceScanner'
+dscan  = '"event":"FSSDiscoveryScan"'
+defalut = '"MusicTrack":"NoTrack"'
+defalut2 = ' "MusicTrack":"Exploration"'
+super_cruise_music =' "MusicTrack":"Supercruise"'
+
+dockGranted = '"event":"DockingGranted"'
+dockingMusic = '"MusicTrack":"DockingComputer"'
+dockedMusic = '"MusicTrack":"Starport"'
+
+shutdown = '"event":"Shutdown"'
+menu =  '"event":"Music", "MusicTrack":"MainMenu"'
+discovered =  '"event":"FSSSignalDiscovered"'
+fsd_target = '"event":"FSDTarget"'
+collected = ' "event":"MaterialCollected"'
+
+mission_accepted = '"event":"MissionAccepted"'
+dead = '"event":"Died"'
+ressurect = '"event":"Resurrect"'
+
+buy_drones = '"event":"BuyDrones"'
+
+cargo =  '"event":"CollectCargo"'
+cargo2 =  '"event":"Cargo"'
+
+target =  '"event":"ShipTargeted"'
 
 
-# main function
-def start():
+last_log_update = time()
+last_alert = 0
 
-    processName = "elitedangerous"
+log_update_seconds = 60
+alert_update_seconds = 120
 
-    while 1 > 0:
-        for proc in psutil.process_iter():
-            if processName.lower() not in proc.name().lower():
-                print("ED running")
-                
-                #Label(main, text = "You can minimize this window...", bg = "#000000", fg = "#f07b05", font = ("sintony", 12)).pack()
+time_running = 10**100 # BIG number
 
-                if config.chromaEnable:
+latest_file = get_log()
+with open(latest_file, 'r') as currentLog:
+    while True:
+        sleep(0.1)
+        # Refresh log file
+        if time() - last_log_update > log_update_seconds:
+            new_file = get_log()
+            if new_file != latest_file:
+                currentLog = open(latest_file, 'r')
+            last_log_update = time()
 
-                    # app info and creation (chroma)
-                    info = ChromaAppInfo()
-                    info.DeveloperName = 'Hector Robe'
-                    info.DeveloperContact = 'hector.brobe@gmail.com'
-                    info.Category = 'application'
-                    info.SupportedDevices = ['keyboard']
-                    info.Description = 'Reacts to events in Elite Dangerous'
-                    info.Title = 'Elite Dangerous Sync'
-                    app = ChromaApp(info)
-                    print("Chroma App Started")
+        # Read lines
+        lines = currentLog.read().splitlines()
+        
+        if len(lines) != 0:
+            # Last line of log (most recent event)
+            lastLine = str(lines[-1])
+
+            # Ingnore text events for now
+            if '"event":"ReceiveText"' in lastLine:
+                continue
+
+            print(lastLine)
+
+            # Ship targeted / interdiction
+            if target in lastLine:
+                data = json.loads(lastLine)
+                engine.say("Target")
+                engine.runAndWait()
+                if 'Ship_Localised' in data:
+                    engine.say(data['Ship_Localised'])
                 else:
-                    print("Chroma App Not Started")
+                     engine.say(data['Ship'])
+                engine.runAndWait()
+                engine.say(f"Scan stage {data['ScanStage']}")
+                engine.runAndWait()
+                if 'LegalStatus' in data:
+                    engine.say(f"Status {data['LegalStatus']}")
+                    engine.runAndWait()
 
-            ###########################################################
+            # Shutdown
+            if shutdown in lastLine or menu in lastLine:
+                if time_running < time():
+                    print(time_running)
+                    print(time())
+                    lifx.off()
+                    time_running = time()
+                else:
+                    print('Ignore last shutdown')
 
+            # under attack
+            elif underAttack in lastLine:
+                if time() - last_alert > alert_update_seconds:
+                    last_alert = time()
+                    flashYellow()
+                else:
+                    print('No alert yet')
 
-                # lights
-
-                def whiteBright():
-                    print("white bright testing")
-                    try:
-                        lifx.whiteBright()
-                    except:
-                        print("Failed LIFX")
-                    try:
-                        chroma.whiteBright(app)
-                    except:
-                        print("Failed Chroma")
-                    try:
-                        cue.whiteBright()
-                    except:
-                        print("Failed Cue")
-                    try:
-                        hue.whiteBright()
-                    except:
-                        print("Failed Hue")
-                    
-                def whiteDim():
-
-                    try:
-                        lifx.whiteDim()
-                    except:
-                        print("Failed LIFX")
-                    try:
-                        chroma.whiteDim(app)
-                    except:
-                        print("Failed Chroma")
-                    try:
-                        cue.whiteDim()
-                    except:
-                        print("Failed Cue")
-                    try:
-                        hue.whiteDim()
-                    except:
-                        print("Failed Hue")
-
-                # start as dim white
-                whiteDim()
-                    
-                def orange():
-
-                    try:
-                        lifx.orange()
-                    except:
-                        print("Failed LIFX")
-                    try:
-                        chroma.orange(app)
-                    except:
-                        print("Failed Chroma")
-                    try:
-                        cue.orange()
-                    except:
-                        print("Failed Cue")
-                    try:
-                        hue.orange()
-                    except:
-                        print("Failed Hue")
-                    
-                def flashGreen():
-
-                    try:
-                        chroma.flashGreen(app)
-                    except:
-                        print("Failed Chroma")
-                    try:
-                        lifx.flashGreen()
-                    except:
-                        print("Failed LIFX")
-                    try:
-                        cue.flashGreen()
-                    except:
-                        print("Failed Cue")
-                    try:
-                        hue.flashGreen()
-                    except:
-                        print("Failed Hue")
-
-                def flashRed():
-
-                    # counter
-                    a = 0
-
-                    while a < 10:
-
-                        try:
-                            chroma.flashRed(app)
-                        except:
-                            print("Failed Chroma")
-                        try:
-                            lifx.flashRed()
-                        except:
-                            print("Failed LIFX")
-                        try:
-                            cue.flashRed()
-                        except:
-                            print("Failed Cue")
-                        try:
-                            hue.flashRed()
-                        except:
-                            print("Failed Hue")
-
-                        # add to counter
-                        a = a + 1
-
-                    # default
-                    try:
-                        lifx.whiteDim()
-                    except:
-                            print("Failed LIFX")
-                    try:
-                        chroma.whiteDim(app)
-                    except:
-                            print("Failed Chroma")
-                    try:
-                        cue.whiteDim()
-                    except:
-                            print("Failed Cue")
-                    try:
-                        hue.whiteDim()
-                    except:
-                            print("Failed Hue")
-
-                def flashYellow():
-
-                    try:
-                        chroma.flashYellow(app)
-                    except:
-                            print("Failed Chroma")
-                    try:
-                        lifx.flashYellow()
-                    except:
-                            print("Failed LIFX")
-                    try:
-                        cue.flashYellow()
-                    except:
-                            print("Failed Cue")
-                    try:
-                        hue.flashYellow()
-                    except:
-                            print("Failed Hue")
-                    
-                def flashBlue():
-
-                    try:
-                        chroma.flashBlue(app)
-                    except:
-                            print("Failed Chroma")
-                    try:
-                        lifx.flashBlue()
-                    except:
-                            print("Failed LIFX")
-                    try:
-                        cue.flashBlue()
-                    except:
-                            print("Failed Cue")
-                    try:
-                        hue.flashBlue()
-                    except:
-                            print("Failed Hue")
-
-            ########################################################
-
-                sleep(20)
-
-                # get latest log
-                list_of_files = glob.glob(config.logLocation)
-                try:
-                    latest_file = max(list_of_files, key=os.path.getctime)
-                    
-                    print(latest_file)
-
-                    # open latest log
-                    currentLog = open(latest_file, 'r')
-
-                    # defines events
-                    music = '"event":"Music", "MusicTrack":"NoTrack"'
-                    underAttack = '"event":"UnderAttack", "Target":"You"'
-                    hullDamage = '"event":"HullDamage"'
-                    heatDamage = '"event":"HeatDamage"'
-                    heatWarning = '"event":"HeatWarning"'
-                    shieldOff = '"event":"ShieldState", "ShieldsUp":false'
-                    shieldOn = '"event":"ShieldState", "ShieldsUp":true'
-                    docked = '"event":"Docked"'
-                    dockedMusic2 = '"event":"Music", "MusicTrack":"Exploration"'
-                    dockedMusic = '"event":"Music", "MusicTrack":"Starport"'
-                    undocked = '"event":"Undocked"'
-                    dockGranted = '"event":"DockingGranted"'
-                    kill = '"event":"PVPKill"'
-                    supercruiseEnter = '"event":"SupercruiseEntry"'
-                    supercruiseExit = '"event":"SupercruiseExit"'
-                    dockingMusic = '"event":"Music", "MusicTrack":"DockingComputer"'
-                    shutdown = '"event":"Shutdown"'
-
-
-                ########################################################
-
-
-
-                    # always watching events
-                    while 0 < 1:
-
-                        # reads lines
-                        reader = currentLog.read().splitlines()
-
-                        # checks if any events exist
-                        if len(reader) != 0:
-
-                            # gets last line of log (most recent event)
-                            lastLine = reader[-1]
-
-                            # removes music from results
-                            if music not in lastLine:
-
-                                # prints last line of file
-                                print(lastLine)
-
-                                # checks for different events and runs functions
-                                if shieldOff in lastLine:
-
-                                    orange()
-                                    sleep(1)
-
-                                elif docked in lastLine or dockedMusic in lastLine or shutdown in lastLine: # or dockedMusic2 in lastLine:
-
-                                    whiteBright()
-
-                                elif shieldOn in lastLine or undocked in lastLine or dockingMusic in lastLine:
-
-                                    whiteDim()
-
-                                elif dockGranted in lastLine or kill in lastLine:
-
-                                    flashGreen()
-
-                                elif supercruiseEnter in lastLine:
-
-                                    flashYellow()
-
-                                elif supercruiseExit in lastLine:
-
-                                    flashBlue()
-                                    
-                                elif underAttack in lastLine or hullDamage in lastLine or heatDamage in lastLine or heatWarning in lastLine:
-                                    
-                                    flashRed()
-
-                        # does nothing
-                        else:
-                            pass
-
-                except:
-                    print("Please add your Elite Dangerous log file location to the config.py file before running")
-
+            elif shieldOff in lastLine:
+                lifx.yellow()
+            elif dockedMusic in lastLine: 
+                lifx.docked_blue()
+            elif shieldOn in lastLine:
+                lifx.pulse_green()
+                sleep(0.5)
+                lifx.default()
+            elif dockGranted in lastLine or kill in lastLine:
+                flashGreen()
+            elif hyper_space in lastLine:
+                lifx.blue()
+            elif hyper_space_exit in lastLine:
+                lifx.blue()
+                sleep(0.3)
+                lifx.default()  
+            elif heatWarning in lastLine:
+                lifx.orange()
+            elif heatDamage in lastLine or dead in lastLine:
+                lifx.red()
+            elif hullDamage in lastLine or cargo in lastLine:
+                flashRed()
+            elif dscan in lastLine or supercruiseEnter in lastLine:
+                lifx.pulse_blue()
+            elif refuel in lastLine or repair in lastLine or stock in lastLine or collected in lastLine or mission_accepted in lastLine or buy_drones in lastLine:
+                lifx.pulse_green()
+            elif discovered in lastLine:
+                lifx.pulse_red() 
+            elif system_map in lastLine or scanner in lastLine or galaxy_map in lastLine:
+                lifx.dark()
+            elif defalut in lastLine or defalut2 in lastLine:
+                lifx.default()
+            elif dockingMusic in lastLine:
+                lifx.green()
+            elif super_cruise_music in lastLine:
+                lifx.orange_dark()
+            elif ressurect in lastLine:
+                lifx.whiteBright
+                sleep(0.75)
             else:
-                print("ED not running")
-
-
-########################################################
-
-
-# gui setup
-main = Tk()
-
-main.title("Elite Dangerous Light Sync")
-main.geometry("700x500")
-main.configure(background = "#000000")
-
-# logo image
-edlogo = PhotoImage(file = "assets\edlogo2.gif")
-
-# gui
-Label(main, text = "Elite Dangerous Light Sync", bg = "#000000", fg = "#f07b05", font = ("euro caps", 38)).pack()
-Label(main, bg = "#000000").pack()
-Label(main, text = "Created by Hector Robe", bg = "#000000", fg = "#f07b05", bd = "0", font = ("sintony", 12)).pack()
-Label(main, bg = "#000000").pack()
-Button(main, compound = LEFT, image = edlogo, borderwidth = 0, highlightthickness = 0, pady = 0, padx = 10, text = "Start Lighting", relief = SOLID, command = start, bg = "#f07b05", fg = "#ffffff", font = ("euro caps", 32)).pack()
-Label(main, bg = "#000000").pack()
-
-# gui setup
-main.mainloop()
+                print('no match')
 
 
